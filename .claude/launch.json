@@ -4,7 +4,7 @@
     {
       "name": "sine",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "5178"],
+      "runtimeArgs": ["serve.py", "5178"],
       "port": 5178
     }
   ]
