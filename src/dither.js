@@ -36,10 +36,7 @@ function compile(gl, type, source) {
 
 export function createDither(source, out) {
   const gl = out.getContext('webgl', { alpha: false, antialias: false });
-  if (!gl) {
-    out.hidden = true;
-    return () => {};
-  }
+  if (!gl) return null;
 
   const program = gl.createProgram();
   gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, VERTEX));

@@ -1,6 +1,6 @@
 // The only thing that changes state over time on its own. No meter: every gap is randomised.
 import { state, PARTIALS, RIPPLES } from './state.js';
-import { CHORDS, nearestTone, leadAll, freshTone, moveKey } from './tuning.js';
+import { MOODS, nearestTone, leadAll, freshTone, moveKey } from './tuning.js';
 import { TAU, rand, pick, clamp, smoothstep, approach } from './util.js';
 
 const START_KEY = 165;
@@ -23,7 +23,8 @@ const wander = () => [rand(0.05, 0.15), rand(37, 89), rand(0, TAU), rand(0.05, 0
 export function createConductor() {
   let t = 0;
   let key = START_KEY;
-  let chord = 0;
+  let chord = MOODS.mixed.chords[0];
+  let mood = state.mood;
   let nextLeave = 0;
   const events = {};
   const tidePeriods = [rand(150, 200), rand(250, 330)];
@@ -53,7 +54,8 @@ export function createConductor() {
     wander: wander(),
   }));
 
-  const chordFreqs = () => CHORDS[chord].map((r) => key * r);
+  const chordFreqs = () => chord.map((r) => key * r);
+  const moodOf = () => MOODS[state.mood] ?? MOODS.mixed;
   const living = () => voices.filter((p) => p.alive);
   const at = (name, delay) => {
     events[name] = t + delay;
@@ -113,17 +115,20 @@ export function createConductor() {
       if (living().length < room()) addVoice();
       at('arrive', rand(8, 25));
     },
-    chord(dur = rand(4, 8)) {
-      let next = chord;
-      while (next === chord) next = Math.floor(Math.random() * CHORDS.length);
-      chord = next;
+    chord(dur = rand(4, 8), next) {
+      const options = moodOf().chords.filter((c) => c.join() !== chord.join());
+      chord = next ?? pick(options.length ? options : moodOf().chords);
       const moving = living();
       const targets = leadAll(moving.map((p) => 2 ** p.log), chordFreqs());
       moving.forEach((p, i) => glide(p, targets[i], dur));
       at('chord', rand(12, 26));
     },
+    signature() {
+      events.signature = Infinity;
+      actions.chord(rand(4, 6), moodOf().signature);
+    },
     key() {
-      key = moveKey(key);
+      key = moveKey(key, moodOf().keyMoves);
       actions.chord(rand(6, 10));
       at('key', rand(70, 160));
     },
@@ -160,6 +165,11 @@ export function createConductor() {
   function update(dtReal) {
     const dt = dtReal * state.driftSpeed;
     t += dt;
+    if (state.mood !== mood) {
+      // Answer a new mood straight away with its most characteristic chord.
+      mood = state.mood;
+      at('signature', rand(0.5, 1.5));
+    }
     for (const name in events) if (t >= events[name]) actions[name]();
 
     // Everything starts pure, and the texture fades in over the first minute or so.

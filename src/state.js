@@ -37,6 +37,8 @@ export const state = {
   haze: 1,
   bass: 0,
   brown: 0.33,
+  mood: 'mixed',
+  lowGraphics: false,
   noise: 0,
   wobble: 0,
   reverb: 0,

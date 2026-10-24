@@ -9,6 +9,13 @@ export function attachControls(state, conductor, togglePause) {
     });
   }
 
+  const mood = document.getElementById('mood');
+  mood.value = state.mood;
+  mood.addEventListener('change', () => {
+    state.mood = mood.value;
+    mood.blur();
+  });
+
   const toggle = () => {
     panel.hidden = !panel.hidden;
   };
@@ -31,6 +38,24 @@ export function attachControls(state, conductor, togglePause) {
     fullscreen.textContent = document.fullscreenElement ? 'exit fullscreen' : 'fullscreen';
   });
 
+  // Remembered on this device only, so a phone can stay in low graphics.
+  const lowgfx = document.getElementById('lowgfx');
+  try {
+    state.lowGraphics = localStorage.getItem('sine.lowGraphics') === '1';
+  } catch {}
+  const showLowgfx = () => {
+    lowgfx.textContent = `low graphics: ${state.lowGraphics ? 'on' : 'off'}`;
+  };
+  showLowgfx();
+  lowgfx.addEventListener('click', (e) => {
+    state.lowGraphics = !state.lowGraphics;
+    try {
+      localStorage.setItem('sine.lowGraphics', state.lowGraphics ? '1' : '0');
+    } catch {}
+    showLowgfx();
+    e.currentTarget.blur();
+  });
+
   const pause = document.getElementById('pause');
   const doPause = () => {
     const paused = togglePause();
@@ -42,7 +67,7 @@ export function attachControls(state, conductor, togglePause) {
   });
 
   addEventListener('keydown', (e) => {
-    if (e.target instanceof HTMLInputElement) return;
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
     if (e.key === 'h') toggle();
     if (e.key === 'f') toggleFullscreen();
     if (e.key === 'ArrowRight') conductor.addVoice();

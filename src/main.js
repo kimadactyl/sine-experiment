@@ -12,12 +12,16 @@ import { ditherLevels } from './mapping.js';
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const begin = document.getElementById('begin');
-const dither = createDither(canvas, document.getElementById('dither'));
+const ditherCanvas = document.getElementById('dither');
+const dither = createDither(canvas, ditherCanvas);
 
 let w = 0;
 let h = 0;
 let dpr = 1;
+let frozen = null;
 function resize() {
+  // Setting the canvas size wipes it, so a paused picture has to be drawn again.
+  frozen = null;
   dpr = Math.min(2, devicePixelRatio || 1);
   w = canvas.width = Math.round(innerWidth * dpr);
   h = canvas.height = Math.round(innerHeight * dpr);
@@ -50,8 +54,12 @@ begin.addEventListener('click', () => {
   begin.classList.add('gone');
 }, { once: true });
 
+// Everything moves slowly, so 60 frames a second looks the same as a 120 Hz screen's full rate at half the work.
+const FRAME_MS = 1000 / 60;
 let last = performance.now();
 function frame(now) {
+  requestAnimationFrame(frame);
+  if (now - last < FRAME_MS - 2) return;
   // Capped so a backgrounded tab doesn't jump the piece forward on return.
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
@@ -61,10 +69,15 @@ function frame(now) {
     updateOverlaps(state);
     updateAudio(state);
   }
+  // A paused picture is frozen, so draw it once and redraw only if the canvas or graphics mode changes.
+  const look = `${w}x${h}:${state.lowGraphics}`;
+  if (running && paused && frozen === look) return;
+  frozen = running && paused ? look : null;
   draw(ctx, w, h, dpr, state, live ? dt : 0);
-  dither(ditherLevels(state.noise), dpr);
+  const useDither = dither && !state.lowGraphics;
+  ditherCanvas.hidden = !useDither;
+  if (useDither) dither(ditherLevels(state.noise), dpr);
   showStatus();
-  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
