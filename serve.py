@@ -9,5 +9,10 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
 
+class Server(http.server.ThreadingHTTPServer):
+    # The page requests about fifteen modules at once; the default queue of 5 drops some.
+    request_queue_size = 64
+
+
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 5178
-http.server.ThreadingHTTPServer(("", port), NoCacheHandler).serve_forever()
+Server(("", port), NoCacheHandler).serve_forever()
