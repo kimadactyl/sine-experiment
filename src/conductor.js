@@ -1,11 +1,12 @@
 // The only thing that changes state over time on its own. No meter: every gap is randomised.
-import { state, PARTIALS } from './state.js';
+import { state, PARTIALS, RIPPLES } from './state.js';
 import { CHORDS, nearestTone, leadAll, freshTone, moveKey } from './tuning.js';
 import { TAU, rand, clamp, smoothstep, approach } from './util.js';
 
 const START_KEY = 165;
 const SILENT = 0.003;
 const INTRO = 90;
+const SPIKE_LEVEL = 0.45;
 
 // Ears hear high sines as louder than low ones at the same level, so higher circles play softer.
 const pitchLoudness = (freq) => Math.min(1.15, (START_KEY / freq) ** 0.6);
@@ -41,6 +42,9 @@ export function createConductor() {
     ampTau: 3,
     partials: new Array(PARTIALS).fill(0),
     partialTargets: new Array(PARTIALS).fill(0),
+    spike: 0,
+    spikeTarget: 0,
+    points: 1,
     breath: [rand(9, 14), rand(19, 31), rand(0, TAU), rand(0, TAU)],
     wow: rand(0, TAU),
     home: { x: 0, y: 0 },
@@ -73,11 +77,12 @@ export function createConductor() {
     p.heading = rand(0, TAU);
     p.speed = rand(0.004, 0.01);
     p.wander = wander();
+    p.spike = p.spikeTarget = 0;
     newPartials(p);
   }
 
   function newPartials(p) {
-    for (let k = 1; k < PARTIALS; k++) {
+    for (let k = 1; k < RIPPLES; k++) {
       p.partialTargets[k] = Math.random() < 0.55 ? rand(0.05, 0.4) / Math.sqrt(k) : 0;
     }
   }
@@ -126,6 +131,18 @@ export function createConductor() {
       for (const p of voices) newPartials(p);
       at('partials', rand(10, 22));
     },
+    spike() {
+      // One circle at a time; the lowest, so its extra harmonics stay warm rather than shrill.
+      const spiky = living().find((p) => p.spikeTarget > 0);
+      if (spiky) {
+        if (Math.random() < 0.5) spiky.spikeTarget = 0;
+      } else if (living().length && voices.every((p) => p.spike < 0.02)) {
+        const p = living().reduce((a, b) => (a.log < b.log ? a : b));
+        p.spikeTarget = 1;
+        if (p.spike < 0.01) p.points = 4 + Math.floor(Math.random() * 4);
+      }
+      at('spike', rand(60, 150));
+    },
   };
 
   function start() {
@@ -134,6 +151,7 @@ export function createConductor() {
     at('chord', rand(8, 14));
     at('key', rand(60, 100));
     at('partials', rand(5, 10));
+    at('spike', INTRO + rand(60, 120));
   }
 
   function update(dtReal) {
@@ -196,6 +214,12 @@ export function createConductor() {
       for (let k = 1; k < PARTIALS; k++) {
         p.partials[k] = approach(p.partials[k], p.partialTargets[k], dt, 5);
         v.partials[k] = p.partials[k] * harm * soften(v.freq * (k + 1));
+      }
+
+      p.spike = approach(p.spike, p.spikeTarget, dt, 12);
+      v.points = p.points;
+      for (let k = 1; k < PARTIALS; k++) {
+        v.spikes[k] = (p.spike * SPIKE_LEVEL * state.harmonics * soften(v.freq * (k + 1))) / Math.sqrt(k + 1);
       }
 
       // Home wanders on a slowly turning heading and turns back at the edges.

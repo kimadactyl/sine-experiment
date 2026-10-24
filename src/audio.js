@@ -99,7 +99,7 @@ export function updateAudio(state) {
     n.panner.pan.setTargetAtTime(pan(v.ox), t, 0.1);
     for (let k = 0; k < PARTIALS; k++) {
       n.oscs[k].frequency.setTargetAtTime(v.freq * (k + 1), t, 0.02);
-      n.gains[k].gain.setTargetAtTime(v.partials[k], t, 0.05);
+      n.gains[k].gain.setTargetAtTime(v.partials[k] + v.spikes[k], t, 0.05);
     }
   });
   state.overlaps.forEach((o, i) => {

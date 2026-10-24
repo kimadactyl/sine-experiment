@@ -1,7 +1,7 @@
 import { radius, hue, lightness, CHROMA, rippleDepth, grainAlpha, lensAlpha, colour } from './mapping.js';
 import { TAU } from './util.js';
 
-const EDGE_STEPS = 200;
+const EDGE_STEPS = 360;
 
 // Ripple rotation, advanced by each voice's own frequency.
 const spin = [];
@@ -68,6 +68,8 @@ function edge(ctx, { cx, cy, r, v, phase }) {
     for (let k = 1; k < v.partials.length; k++) {
       const n = k + 1;
       rr += rippleDepth(v.partials[k]) * Math.sin(n * theta + phase * n * (1 + 0.15 * k));
+      // Spike harmonics share one phase, so they pile up into `points` sharp tips.
+      rr += rippleDepth(v.spikes[k]) * Math.cos(n * v.points * (theta - phase * 0.3));
     }
     const px = cx + Math.cos(theta) * r * rr;
     const py = cy + Math.sin(theta) * r * rr;
