@@ -64,12 +64,14 @@ function edge(ctx, { cx, cy, r, v, phase }) {
   ctx.beginPath();
   for (let s = 0; s <= EDGE_STEPS; s++) {
     const theta = (s / EDGE_STEPS) * TAU;
+    // A swell laps the edge faster than the tips turn, so each tip rises and falls as it passes.
+    const swell = 0.35 + 0.65 * ((1 + Math.cos(theta - phase * 3)) / 2) ** 3;
     let rr = 1;
     for (let k = 1; k < v.partials.length; k++) {
       const n = k + 1;
       rr += rippleDepth(v.partials[k]) * Math.sin(n * theta + phase * n * (1 + 0.15 * k));
       // Spike harmonics share one phase, so they pile up into `points` sharp tips.
-      rr += rippleDepth(v.spikes[k]) * Math.cos(n * v.points * (theta - phase * 0.3));
+      rr += swell * rippleDepth(v.spikes[k]) * Math.cos(n * v.points * (theta - phase * 0.3));
     }
     const px = cx + Math.cos(theta) * r * rr;
     const py = cy + Math.sin(theta) * r * rr;
