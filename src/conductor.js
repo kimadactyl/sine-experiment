@@ -1,7 +1,7 @@
 // The only thing that changes state over time on its own. No meter: every gap is randomised.
 import { state, PARTIALS, RIPPLES } from './state.js';
 import { CHORDS, nearestTone, leadAll, freshTone, moveKey } from './tuning.js';
-import { TAU, rand, clamp, smoothstep, approach } from './util.js';
+import { TAU, rand, pick, clamp, smoothstep, approach } from './util.js';
 
 const START_KEY = 165;
 const SILENT = 0.003;
@@ -132,13 +132,16 @@ export function createConductor() {
       at('partials', rand(10, 22));
     },
     spike() {
-      // One circle at a time; the lowest, so its extra harmonics stay warm rather than shrill.
-      const spiky = living().find((p) => p.spikeTarget > 0);
-      if (spiky) {
-        if (Math.random() < 0.5) spiky.spikeTarget = 0;
-      } else if (living().length && voices.every((p) => p.spike < 0.02)) {
-        const p = living().reduce((a, b) => (a.log < b.log ? a : b));
+      // Usually one spiky circle, sometimes two, never more; the lowest calm one, so its extra harmonics stay warm.
+      const spiky = living().filter((p) => p.spikeTarget > 0);
+      const calm = living().filter((p) => p.spikeTarget === 0);
+      const busy = voices.filter((p) => (p.spike > 0.02 && (p.alive || p.amp > SILENT)) || (p.alive && p.spikeTarget > 0)).length;
+      if (spiky.length && Math.random() < (spiky.length === 2 ? 0.5 : 0.35)) {
+        pick(spiky).spikeTarget = 0;
+      } else if (calm.length && (spiky.length === 0 ? busy === 0 : busy < 2 && Math.random() < 0.6)) {
+        const p = calm.reduce((a, b) => (a.log < b.log ? a : b));
         p.spikeTarget = 1;
+        p.dies = Math.max(p.dies, t + rand(90, 160));
         if (p.spike < 0.01) p.points = 4 + Math.floor(Math.random() * 4);
       }
       at('spike', rand(60, 150));
