@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sine</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #0b0b0e;
+      color: #d8d4cc;
+      font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    #begin {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      gap: 10px;
+      text-align: center;
+      background: none;
+      border: 0;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      transition: opacity 2s;
+    }
+    #begin h1 {
+      margin: 0;
+      font-weight: 300;
+      font-size: 28px;
+      letter-spacing: 0.3em;
+    }
+    #begin p {
+      margin: 0;
+      opacity: 0.5;
+    }
+    #begin.gone {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #toggle {
+      position: fixed;
+      right: 12px;
+      bottom: 12px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid #ffffff22;
+      background: none;
+      color: inherit;
+      opacity: 0.4;
+      cursor: pointer;
+    }
+    #panel {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #00000066;
+      backdrop-filter: blur(8px);
+      display: grid;
+      grid-template-columns: auto 140px;
+      gap: 8px 12px;
+      align-items: center;
+    }
+    #panel[hidden] {
+      display: none;
+    }
+    #panel label {
+      opacity: 0.7;
+    }
+    #panel button {
+      grid-column: 1 / -1;
+      background: none;
+      border: 1px solid #ffffff33;
+      border-radius: 6px;
+      color: inherit;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    #stage {
+      grid-column: 1 / -1;
+      opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <button id="begin">
+    <h1>sine</h1>
+    <p>tap to begin</p>
+    <p>drag a circle to bend it · scroll or pinch to swell it · h for controls</p>
+  </button>
+
+  <button id="toggle" aria-label="Controls">·</button>
+
+  <div id="panel" hidden>
+    <span id="stage"></span>
+    <label for="master">volume</label>
+    <input id="master" name="master" type="range" min="0" max="1" step="0.01">
+    <label for="driftSpeed">drift speed</label>
+    <input id="driftSpeed" name="driftSpeed" type="range" min="0.25" max="3" step="0.05">
+    <label for="harmonics">harmonics</label>
+    <input id="harmonics" name="harmonics" type="range" min="0" max="2" step="0.01">
+    <label for="haze">haze</label>
+    <input id="haze" name="haze" type="range" min="0" max="2" step="0.01">
+    <button id="next">next stage →</button>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
