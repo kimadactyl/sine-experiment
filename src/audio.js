@@ -5,6 +5,7 @@ const VOICE_LEVEL = 0.15;
 const NOISE_LEVEL = 0.015;
 const OVERLAP_LEVEL = 0.12;
 const OUTPUT_GAIN = 2.5;
+const DRIFT_CENTS = 3;
 
 let ctx;
 let master;
@@ -88,6 +89,13 @@ export function startAudio(state) {
     for (let k = 0; k < PARTIALS; k++) {
       const osc = ctx.createOscillator();
       osc.frequency.value = v.freq * (k + 1);
+      // Each harmonic wanders a few cents on its own slow cycle, like an analogue oscillator.
+      const drift = ctx.createOscillator();
+      drift.frequency.value = 0.03 + Math.random() * 0.09;
+      const driftDepth = ctx.createGain();
+      driftDepth.gain.value = DRIFT_CENTS;
+      drift.connect(driftDepth).connect(osc.detune);
+      drift.start();
       const g = ctx.createGain();
       g.gain.value = 0;
       osc.connect(g).connect(out);
