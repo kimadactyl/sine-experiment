@@ -6,6 +6,7 @@ import { attachInput } from './input.js';
 import { attachControls } from './controls.js';
 import { updateOverlaps } from './overlaps.js';
 import { createDither } from './dither.js';
+import { keepAwake, isAwake } from './wakelock.js';
 import { ditherLevels } from './mapping.js';
 
 const canvas = document.getElementById('canvas');
@@ -33,6 +34,7 @@ function togglePause() {
   if (!running) return paused;
   paused = !paused;
   setPaused(paused);
+  keepAwake(!paused);
   return paused;
 }
 
@@ -44,6 +46,7 @@ begin.addEventListener('click', () => {
   startAudio(state);
   conductor.start();
   running = true;
+  keepAwake(true);
   begin.classList.add('gone');
 }, { once: true });
 
@@ -65,4 +68,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.sine = { state, conductor, rms, lastFrame };
+window.sine = { state, conductor, rms, lastFrame, isAwake };
