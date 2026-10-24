@@ -20,7 +20,7 @@ export const CHROMA = 0.15;
 // Harmonic n puts n ripples around the edge, as deep as its gain.
 export const rippleDepth = (gain) => gain * 0.18;
 
-export const pan = (ox) => clamp(ox * 5, -0.7, 0.7);
+export const pan = (ox) => clamp(ox * 1.5, -0.8, 0.8);
 
 export const grainAlpha = (noise) => noise * 0.07;
 

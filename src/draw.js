@@ -4,7 +4,7 @@ import { TAU } from './util.js';
 const EDGE_STEPS = 200;
 
 // Ripple rotation, advanced by each voice's own frequency.
-const spin = [0, 0, 0];
+const spin = [];
 
 // What was drawn last frame, for checking it against state.
 export const lastFrame = [];
@@ -17,7 +17,7 @@ export function draw(ctx, w, h, dpr, state, dt) {
 
   ctx.globalCompositeOperation = 'lighter';
   state.voices.forEach((v, i) => {
-    spin[i] += dt * 0.15 * (v.freq / 165);
+    spin[i] = (spin[i] ?? 0) + dt * 0.15 * (v.freq / 165);
     if (v.amp < 0.002) {
       lastFrame[i] = null;
       return;

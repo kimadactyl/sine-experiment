@@ -1,6 +1,7 @@
 // The single source of truth: audio.js plays these numbers and draw.js draws them.
 
 export const PARTIALS = 5;
+export const VOICES = 6;
 
 function voice() {
   return {
@@ -16,12 +17,14 @@ function voice() {
 }
 
 export const state = {
-  voices: [voice(), voice(), voice()],
+  voices: Array.from({ length: VOICES }, voice),
+  // Half the visible width and height, in units of the shorter side.
+  view: { hx: 0.5, hy: 0.5 },
   master: 0.5,
   driftSpeed: 1,
   harmonics: 1,
   haze: 1,
   noise: 0,
   reverb: 0,
-  stage: '',
+  status: '',
 };

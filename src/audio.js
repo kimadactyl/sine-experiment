@@ -1,7 +1,7 @@
 import { PARTIALS } from './state.js';
 import { pan } from './mapping.js';
 
-const VOICE_LEVEL = 0.18;
+const VOICE_LEVEL = 0.15;
 const NOISE_LEVEL = 0.015;
 
 let ctx;

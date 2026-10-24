@@ -1,8 +1,6 @@
 import { F_MIN, F_MAX } from './mapping.js';
 import { pick } from './util.js';
 
-export const MELODY = [1, 9 / 8, 5 / 4, 4 / 3, 3 / 2, 5 / 3, 2];
-
 // Just-intonation triads as ratios of the key.
 export const CHORDS = [
   [1, 5 / 4, 3 / 2],      // I, 4:5:6
@@ -16,8 +14,6 @@ export const CHORDS = [
 
 const KEY_MOVES = [3 / 2, 4 / 3, 5 / 4, 4 / 5, 2 / 3, 3 / 4];
 const CENTRE = 185;
-
-const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
 
 const dist = (a, b) => Math.abs(Math.log2(a / b));
 
@@ -36,19 +32,59 @@ export function place(freq, near, lo = F_MIN, hi = F_MAX) {
   return best;
 }
 
-// Give each voice a chord tone so the total movement is smallest; the centre pull stops voices creeping to the edges.
-export function voiceLead(current, chord) {
-  let best;
+// The chord tone nearest to freq; the centre pull stops voices creeping to the edges.
+export function nearestTone(freq, chord) {
+  let best = freq;
   let bestCost = Infinity;
-  for (const perm of PERMS) {
-    const targets = current.map((c, i) => place(chord[perm[i]], c));
-    const cost = targets.reduce((sum, t, i) => sum + dist(t, current[i]) + 0.3 * dist(t, CENTRE), 0);
+  for (const c of chord) {
+    const f = place(c, freq);
+    const cost = dist(f, freq) + 0.3 * dist(f, CENTRE);
     if (cost < bestCost) {
-      best = targets;
+      best = f;
       bestCost = cost;
     }
   }
   return best;
+}
+
+// Move every voice to a nearby chord tone, avoiding pitches another voice has already taken.
+export function leadAll(current, chord) {
+  const taken = [];
+  return current.map((freq) => {
+    let best = freq;
+    let bestCost = Infinity;
+    for (const c of chord) {
+      for (let k = -4; k <= 4; k++) {
+        const f = c * 2 ** k;
+        if (f < F_MIN || f > F_MAX) continue;
+        const clash = taken.some((g) => dist(f, g) < 0.01) ? 1 : 0;
+        const cost = dist(f, freq) + 0.15 * dist(f, CENTRE) + clash;
+        if (cost < bestCost) {
+          best = f;
+          bestCost = cost;
+        }
+      }
+    }
+    taken.push(best);
+    return best;
+  });
+}
+
+// A chord tone for a new voice: the least doubled one, in a random octave.
+export function freshTone(chord, sounding) {
+  const uses = (c) => sounding.filter((f) => {
+    const octaves = Math.log2(f / c);
+    return Math.abs(octaves - Math.round(octaves)) < 0.01;
+  }).length;
+  const fewest = Math.min(...chord.map(uses));
+  const c = pick(chord.filter((x) => uses(x) === fewest));
+  const options = [];
+  for (let k = -4; k <= 4; k++) {
+    const f = c * 2 ** k;
+    if (f >= F_MIN && f <= F_MAX) options.push(f);
+  }
+  const free = options.filter((f) => !sounding.some((g) => dist(f, g) < 0.01));
+  return pick(free.length ? free : options);
 }
 
 export function moveKey(key) {

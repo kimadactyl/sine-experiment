@@ -1,29 +1,26 @@
 // The only thing that changes state over time on its own. No meter: every gap is randomised.
 import { state, PARTIALS } from './state.js';
-import { CHORDS, MELODY, place, voiceLead, moveKey } from './tuning.js';
-import { TAU, rand, pick, clamp, smoothstep, approach } from './util.js';
+import { CHORDS, nearestTone, leadAll, freshTone, moveKey } from './tuning.js';
+import { TAU, rand, clamp, smoothstep, approach } from './util.js';
 
-const STAGES = [
-  { name: 'one', dur: 35, env: { breath: 0, spread: 0, harm: 0, wobble: 0, noise: 0, reverb: 0.15 } },
-  { name: 'breathing', dur: 70, env: { breath: 0.5, spread: 0, harm: 0, wobble: 3, noise: 0, reverb: 0.25 } },
-  { name: 'growth', dur: 45, env: { breath: 0.3, spread: 0, harm: 0, wobble: 3, noise: 0.2, reverb: 0.3 } },
-  { name: 'chord', dur: 110, env: { breath: 0.3, spread: 0.09, harm: 0, wobble: 4, noise: 0.4, reverb: 0.35 } },
-  { name: 'harmonics', dur: 90, env: { breath: 0.3, spread: 0.1, harm: 1, wobble: 5, noise: 0.6, reverb: 0.4 } },
-  { name: 'drift', dur: Infinity, env: { breath: 0.4, spread: 0.11, harm: 1, wobble: 6, noise: 0.8, reverb: 0.45 } },
-];
-const DRIFT = STAGES.length - 1;
 const START_KEY = 165;
+const SILENT = 0.003;
+
+// 0 before `from` seconds in, 1 after `to`, smooth in between.
+const ramp = (t, from, to) => smoothstep(clamp((t - from) / (to - from), 0, 1));
+
+// Two slow sine wobbles per axis with unrelated periods, so the path never repeats.
+const wander = () => [rand(0.05, 0.15), rand(37, 89), rand(0, TAU), rand(0.05, 0.15), rand(29, 71), rand(0, TAU)];
 
 export function createConductor() {
   let t = 0;
-  let stage = 0;
-  let stageEnd = Infinity;
   let key = START_KEY;
-  let chord = -1;
-  const env = { ...STAGES[0].env };
+  let chord = 0;
   const events = {};
 
   const voices = state.voices.map(() => ({
+    alive: false,
+    dies: Infinity,
     log: Math.log2(START_KEY),
     from: Math.log2(START_KEY),
     to: Math.log2(START_KEY),
@@ -35,12 +32,19 @@ export function createConductor() {
     ampTau: 3,
     partials: new Array(PARTIALS).fill(0),
     partialTargets: new Array(PARTIALS).fill(0),
-    p1: rand(9, 14),
-    p2: rand(19, 31),
-    o1: rand(0, TAU),
-    o2: rand(0, TAU),
+    breath: [rand(9, 14), rand(19, 31), rand(0, TAU), rand(0, TAU)],
     wow: rand(0, TAU),
+    home: { x: 0, y: 0 },
+    heading: 0,
+    speed: 0,
+    wander: wander(),
   }));
+
+  const chordFreqs = () => CHORDS[chord].map((r) => key * r);
+  const living = () => voices.filter((p) => p.alive);
+  const at = (name, delay) => {
+    events[name] = t + delay;
+  };
 
   function glide(p, freq, dur) {
     p.from = p.log;
@@ -49,123 +53,115 @@ export function createConductor() {
     p.dur = dur;
   }
 
-  const at = (name, delay) => {
-    events[name] = t + delay;
-  };
+  function spawn(p, x, y, freq, amp, fadeIn, life) {
+    p.alive = true;
+    p.dies = t + life;
+    p.log = p.from = p.to = Math.log2(freq);
+    p.dur = 0;
+    p.ampTarget = amp;
+    p.ampTau = fadeIn;
+    p.home = { x, y };
+    p.heading = rand(0, TAU);
+    p.speed = rand(0.004, 0.01);
+    p.wander = wander();
+    newPartials(p);
+  }
+
+  function newPartials(p) {
+    for (let k = 1; k < PARTIALS; k++) {
+      p.partialTargets[k] = Math.random() < 0.55 ? rand(0.05, 0.4) / Math.sqrt(k) : 0;
+    }
+  }
+
+  function addVoice() {
+    const p = voices.find((q) => !q.alive && q.amp < SILENT);
+    if (!p) return;
+    const { hx, hy } = state.view;
+    const freq = freshTone(chordFreqs(), living().map((q) => 2 ** q.log));
+    spawn(p, rand(-hx, hx) * 0.75, rand(-hy, hy) * 0.75, freq, rand(0.3, 0.6), rand(4, 8), rand(50, 130));
+  }
 
   const actions = {
-    melody() {
-      const p = voices[0];
-      const now = 2 ** p.log;
-      let f = now;
-      for (let tries = 0; tries < 6 && Math.abs(Math.log2(f / now)) < 0.02; tries++) {
-        f = place(key * pick(MELODY), now, 130, 280);
-      }
-      glide(p, f, rand(3, 7));
-      at('melody', rand(7, 16));
+    arrive() {
+      // Room for more circles opens up over the first minute and a half.
+      const room = 2 + Math.round(4 * ramp(t, 10, 90));
+      if (living().length < room) addVoice();
+      at('arrive', rand(8, 25));
     },
     chord(dur = rand(4, 8)) {
       let next = chord;
       while (next === chord) next = Math.floor(Math.random() * CHORDS.length);
       chord = next;
-      const targets = voiceLead(voices.map((p) => 2 ** p.log), CHORDS[chord].map((r) => key * r));
-      targets.forEach((f, i) => glide(voices[i], f, dur));
+      const moving = living();
+      const targets = leadAll(moving.map((p) => 2 ** p.log), chordFreqs());
+      moving.forEach((p, i) => glide(p, targets[i], dur));
       at('chord', rand(12, 26));
-    },
-    partials() {
-      for (const p of voices) {
-        for (let k = 1; k < PARTIALS; k++) {
-          p.partialTargets[k] = Math.random() < 0.55 ? rand(0.05, 0.4) / Math.sqrt(k) : 0;
-        }
-      }
-      at('partials', rand(10, 22));
     },
     key() {
       key = moveKey(key);
       actions.chord(rand(6, 10));
       at('key', rand(70, 160));
     },
-    levels() {
-      for (const p of voices) p.ampTarget = rand(0.25, 0.75);
-      at('levels', rand(15, 35));
+    partials() {
+      for (const p of voices) newPartials(p);
+      at('partials', rand(10, 22));
     },
   };
 
-  function enter(i) {
-    stage = i;
-    stageEnd = t + STAGES[i].dur * rand(0.8, 1.2);
-    state.stage = STAGES[i].name;
-    const [a, b, c] = voices;
-
-    if (i === 0) {
-      a.ampTarget = 0.55;
-      a.ampTau = 3;
-    }
-    if (i === 1) at('melody', rand(4, 8));
-    if (i === 2) {
-      events.melody = Infinity;
-      glide(a, key * (2 / 3), 14);
-      a.ampTarget = 0.95;
-      a.ampTau = 10;
-    }
-    if (i === 3) {
-      events.melody = Infinity;
-      // The two new voices are born in unison with the first and glide apart into the chord.
-      for (const p of [b, c]) {
-        p.log = p.from = p.to = a.log;
-        p.ampTarget = 0.55;
-      }
-      a.ampTarget = 0.6;
-      for (const p of voices) p.ampTau = 10;
-      actions.chord(9);
-    }
-    if (i === 4) actions.partials();
-    if (i === DRIFT) {
-      at('key', rand(60, 120));
-      at('levels', rand(10, 20));
-    }
+  function start() {
+    spawn(voices[0], 0, 0, START_KEY, 0.55, 3, rand(120, 180));
+    at('arrive', rand(8, 14));
+    at('chord', rand(8, 14));
+    at('key', rand(60, 100));
+    at('partials', rand(5, 10));
   }
 
   function update(dtReal) {
     const dt = dtReal * state.driftSpeed;
     t += dt;
-    if (t >= stageEnd) enter(stage + 1);
     for (const name in events) if (t >= events[name]) actions[name]();
 
-    const target = STAGES[stage].env;
-    for (const k in env) env[k] = approach(env[k], target[k], dt, 10);
-
-    const harmSwell = stage === DRIFT ? 0.45 + 0.55 * (0.5 + 0.5 * Math.sin((TAU * t) / 97)) : 1;
-    const harm = env.harm * harmSwell * state.harmonics;
-    const turn = (TAU * t) / 83;
-    const cx = 0.02 * Math.sin((TAU * t) / 47);
-    const cy = 0.015 * Math.sin((TAU * t) / 59 + 1);
+    // Everything starts pure, and the texture fades in over the first minute or so.
+    const motion = ramp(t, 0, 15);
+    const breathDepth = 0.45 * ramp(t, 0, 12);
+    const harm = ramp(t, 40, 100) * (0.45 + 0.55 * (0.5 + 0.5 * Math.sin((TAU * t) / 97))) * state.harmonics;
+    const wobble = 6 * ramp(t, 10, 60) * state.haze;
+    const { hx, hy } = state.view;
 
     voices.forEach((p, i) => {
       const v = state.voices[i];
+
+      if (p.alive && t >= p.dies) {
+        if (v.held || living().length === 1) {
+          p.dies = t + rand(30, 60);
+        } else {
+          p.alive = false;
+          p.ampTarget = 0;
+          p.ampTau = rand(8, 14);
+        }
+      }
 
       if (v.held) {
         p.log = Math.log2(v.dragFreq);
         p.wasHeld = true;
       } else {
         if (p.wasHeld) {
-          // Let go: ease back to wherever the piece wants this voice now.
+          // Let go: ease back to the nearest note of whatever chord is sounding now.
           p.wasHeld = false;
-          p.from = p.log;
-          p.t0 = t;
-          p.dur = 6;
+          glide(p, nearestTone(2 ** p.log, chordFreqs()), 6);
         }
         const x = p.dur > 0 ? Math.min(1, (t - p.t0) / p.dur) : 1;
         p.log = p.from + (p.to - p.from) * smoothstep(x);
         v.userGain = approach(v.userGain, 1, dt, 25);
       }
 
-      const wow = env.wobble * state.haze * (0.7 * Math.sin(TAU * 0.4 * t + p.wow) + 0.3 * Math.sin(TAU * 0.13 * t));
+      const wow = wobble * (0.7 * Math.sin(TAU * 0.4 * t + p.wow) + 0.3 * Math.sin(TAU * 0.13 * t));
       v.freq = 2 ** (p.log + wow / 1200);
 
       p.amp = approach(p.amp, p.ampTarget, dt, p.ampTau);
-      const breath = 0.5 + 0.5 * (0.6 * Math.sin((TAU * t) / p.p1 + p.o1) + 0.4 * Math.sin((TAU * t) / p.p2 + p.o2));
-      v.amp = clamp(p.amp * (1 - env.breath * breath) * v.userGain, 0, 1);
+      const [b1, b2, o1, o2] = p.breath;
+      const breath = 0.5 + 0.5 * (0.6 * Math.sin((TAU * t) / b1 + o1) + 0.4 * Math.sin((TAU * t) / b2 + o2));
+      v.amp = clamp(p.amp * (1 - breathDepth * breath) * v.userGain, 0, 1);
 
       v.partials[0] = 1;
       for (let k = 1; k < PARTIALS; k++) {
@@ -173,18 +169,28 @@ export function createConductor() {
         v.partials[k] = p.partials[k] * harm;
       }
 
-      const angle = turn + (i * TAU) / 3;
-      v.ox = cx + env.spread * Math.cos(angle);
-      v.oy = cy + env.spread * Math.sin(angle);
+      // Home wanders on a slowly turning heading and turns back at the edges.
+      p.heading += rand(-0.6, 0.6) * dt;
+      p.home.x += Math.cos(p.heading) * p.speed * motion * dt;
+      p.home.y += Math.sin(p.heading) * p.speed * motion * dt;
+      if (Math.abs(p.home.x) > hx * 0.8) {
+        p.home.x = Math.sign(p.home.x) * hx * 0.8;
+        p.heading = Math.PI - p.heading;
+      }
+      if (Math.abs(p.home.y) > hy * 0.8) {
+        p.home.y = Math.sign(p.home.y) * hy * 0.8;
+        p.heading = -p.heading;
+      }
+      const [ax, px, ox, ay, py, oy] = p.wander;
+      v.ox = p.home.x + motion * ax * Math.sin((TAU * t) / px + ox);
+      v.oy = p.home.y + motion * ay * Math.sin((TAU * t) / py + oy);
     });
 
-    state.noise = env.noise * state.haze;
-    state.reverb = Math.min(1, env.reverb * state.haze);
+    state.noise = 0.8 * ramp(t, 20, 80) * state.haze;
+    state.reverb = Math.min(1, (0.15 + 0.3 * ramp(t, 0, 60)) * state.haze);
+    const n = living().length;
+    state.status = `${n} circle${n === 1 ? '' : 's'}`;
   }
 
-  return {
-    start: () => enter(0),
-    skip: () => enter(Math.min(stage + 1, DRIFT)),
-    update,
-  };
+  return { start, addVoice, update };
 }
