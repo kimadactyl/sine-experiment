@@ -2,7 +2,7 @@ import { PARTIALS } from './state.js';
 import { pan } from './mapping.js';
 
 const VOICE_LEVEL = 0.15;
-const NOISE_LEVEL = 0.015;
+const NOISE_LEVEL = 0.012;
 const OVERLAP_LEVEL = 0.12;
 const OUTPUT_GAIN = 2.5;
 const DRIFT_CENTS = 3;
@@ -137,7 +137,8 @@ export function updateAudio(state) {
     n.out.gain.setTargetAtTime(o.level * OVERLAP_LEVEL, t, 0.08);
     n.panner.pan.setTargetAtTime(pan(o.ox), t, 0.1);
   });
-  noise.gain.setTargetAtTime(state.noise * state.brown * NOISE_LEVEL, t, 0.2);
+  // Set by the brown fader directly, so it responds straight away instead of waiting for the texture to build.
+  noise.gain.setTargetAtTime(state.brown * state.haze * NOISE_LEVEL, t, 0.2);
   wet.gain.setTargetAtTime(state.reverb, t, 0.2);
   master.gain.setTargetAtTime(state.master * OUTPUT_GAIN, t, 0.1);
   setBass(state.bass, t);
