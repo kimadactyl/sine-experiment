@@ -5,6 +5,13 @@ import { TAU, rand, clamp, smoothstep, approach } from './util.js';
 
 const START_KEY = 165;
 const SILENT = 0.003;
+const INTRO = 90;
+
+// Ears hear high sines as louder than low ones at the same level, so higher circles play softer.
+const pitchLoudness = (freq) => Math.min(1.15, (START_KEY / freq) ** 0.6);
+
+// Harmonics landing above about 1 kHz, where hearing is most sensitive, fade away.
+const soften = (freq) => 1 / (1 + (freq / 1200) ** 4);
 
 // 0 before `from` seconds in, 1 after `to`, smooth in between.
 const ramp = (t, from, to) => smoothstep(clamp((t - from) / (to - from), 0, 1));
@@ -16,7 +23,9 @@ export function createConductor() {
   let t = 0;
   let key = START_KEY;
   let chord = 0;
+  let nextLeave = 0;
   const events = {};
+  const tidePeriods = [rand(150, 200), rand(250, 330)];
 
   const voices = state.voices.map(() => ({
     alive: false,
@@ -81,11 +90,22 @@ export function createConductor() {
     spawn(p, rand(-hx, hx) * 0.75, rand(-hy, hy) * 0.75, freq, rand(0.3, 0.6), rand(4, 8), rand(50, 130));
   }
 
+  // How full the piece wants to be: fills up over the intro, then ebbs and flows on two slow unrelated cycles.
+  function tide() {
+    if (t < INTRO) return 1;
+    const s = t - INTRO;
+    const [a, b] = tidePeriods;
+    return 0.5 + 0.5 * (0.6 * Math.cos((TAU * s) / a) + 0.4 * Math.cos((TAU * s) / b));
+  }
+
+  function room() {
+    if (t < INTRO) return 2 + Math.round(4 * ramp(t, 10, INTRO));
+    return 1 + Math.round(5 * tide() ** 1.5);
+  }
+
   const actions = {
     arrive() {
-      // Room for more circles opens up over the first minute and a half.
-      const room = 2 + Math.round(4 * ramp(t, 10, 90));
-      if (living().length < room) addVoice();
+      if (living().length < room()) addVoice();
       at('arrive', rand(8, 25));
     },
     chord(dur = rand(4, 8)) {
@@ -124,9 +144,18 @@ export function createConductor() {
     // Everything starts pure, and the texture fades in over the first minute or so.
     const motion = ramp(t, 0, 15);
     const breathDepth = 0.45 * ramp(t, 0, 12);
-    const harm = ramp(t, 40, 100) * (0.45 + 0.55 * (0.5 + 0.5 * Math.sin((TAU * t) / 97))) * state.harmonics;
+    const fullness = tide();
+    const harm = ramp(t, 40, 100) * (0.4 + 0.6 * fullness) * (0.45 + 0.55 * (0.5 + 0.5 * Math.sin((TAU * t) / 97))) * state.harmonics;
     const wobble = 6 * ramp(t, 10, 60) * state.haze;
     const { hx, hy } = state.view;
+
+    // When the tide goes out, the circles nearest the end of their lives leave first, a few seconds apart.
+    const alive = living();
+    if (alive.length > room() && t >= nextLeave) {
+      const leaving = alive.filter((p) => !state.voices[voices.indexOf(p)].held).sort((a, b) => a.dies - b.dies)[0];
+      if (leaving) leaving.dies = t;
+      nextLeave = t + rand(4, 10);
+    }
 
     voices.forEach((p, i) => {
       const v = state.voices[i];
@@ -161,12 +190,12 @@ export function createConductor() {
       p.amp = approach(p.amp, p.ampTarget, dt, p.ampTau);
       const [b1, b2, o1, o2] = p.breath;
       const breath = 0.5 + 0.5 * (0.6 * Math.sin((TAU * t) / b1 + o1) + 0.4 * Math.sin((TAU * t) / b2 + o2));
-      v.amp = clamp(p.amp * (1 - breathDepth * breath) * v.userGain, 0, 1);
+      v.amp = clamp(p.amp * (1 - breathDepth * breath) * v.userGain * pitchLoudness(2 ** p.log), 0, 1);
 
       v.partials[0] = 1;
       for (let k = 1; k < PARTIALS; k++) {
         p.partials[k] = approach(p.partials[k], p.partialTargets[k], dt, 5);
-        v.partials[k] = p.partials[k] * harm;
+        v.partials[k] = p.partials[k] * harm * soften(v.freq * (k + 1));
       }
 
       // Home wanders on a slowly turning heading and turns back at the edges.

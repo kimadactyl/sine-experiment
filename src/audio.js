@@ -20,7 +20,7 @@ export function startAudio(state) {
   const mix = ctx.createGain();
   const lowpass = ctx.createBiquadFilter();
   lowpass.type = 'lowpass';
-  lowpass.frequency.value = 2200;
+  lowpass.frequency.value = 1500;
   lowpass.Q.value = 0.4;
 
   const reverb = ctx.createConvolver();
