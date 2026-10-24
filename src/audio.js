@@ -113,6 +113,17 @@ export function updateAudio(state) {
   master.gain.setTargetAtTime(state.master, t, 0.1);
 }
 
+// Fade out before suspending so pausing doesn't click; updateAudio fades back in on resume.
+export function setPaused(paused) {
+  if (!ctx) return;
+  if (paused) {
+    master.gain.setTargetAtTime(0, ctx.currentTime, 0.04);
+    setTimeout(() => ctx.suspend(), 200);
+  } else {
+    ctx.resume();
+  }
+}
+
 // Loudness of what's actually leaving the speakers, for checking it's alive.
 export function rms() {
   if (!analyser) return 0;

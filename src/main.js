@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { startAudio, updateAudio, rms } from './audio.js';
+import { startAudio, updateAudio, setPaused, rms } from './audio.js';
 import { draw, lastFrame } from './draw.js';
 import { createConductor } from './conductor.js';
 import { attachInput } from './input.js';
@@ -24,11 +24,19 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
+let running = false;
+let paused = false;
+function togglePause() {
+  if (!running) return paused;
+  paused = !paused;
+  setPaused(paused);
+  return paused;
+}
+
 const conductor = createConductor();
-const showStatus = attachControls(state, conductor);
+const showStatus = attachControls(state, conductor, togglePause);
 attachInput(canvas, state);
 
-let running = false;
 begin.addEventListener('click', () => {
   startAudio(state);
   conductor.start();
@@ -41,12 +49,13 @@ function frame(now) {
   // Capped so a backgrounded tab doesn't jump the piece forward on return.
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  if (running) {
+  const live = running && !paused;
+  if (live) {
     conductor.update(dt);
     updateOverlaps(state);
     updateAudio(state);
   }
-  draw(ctx, w, h, dpr, state, dt);
+  draw(ctx, w, h, dpr, state, live ? dt : 0);
   showStatus();
   requestAnimationFrame(frame);
 }

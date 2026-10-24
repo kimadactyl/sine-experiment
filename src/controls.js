@@ -1,4 +1,4 @@
-export function attachControls(state, conductor) {
+export function attachControls(state, conductor, togglePause) {
   const panel = document.getElementById('panel');
   const status = document.getElementById('stage');
 
@@ -15,10 +15,24 @@ export function attachControls(state, conductor) {
   document.getElementById('toggle').addEventListener('click', toggle);
   document.getElementById('next').addEventListener('click', () => conductor.addVoice());
 
+  const pause = document.getElementById('pause');
+  const doPause = () => {
+    const paused = togglePause();
+    pause.textContent = paused ? 'play' : 'pause';
+  };
+  pause.addEventListener('click', (e) => {
+    doPause();
+    e.currentTarget.blur();
+  });
+
   addEventListener('keydown', (e) => {
     if (e.target instanceof HTMLInputElement) return;
     if (e.key === 'h') toggle();
     if (e.key === 'ArrowRight') conductor.addVoice();
+    if (e.key === ' ') {
+      e.preventDefault();
+      doPause();
+    }
   });
 
   return function showStatus() {
