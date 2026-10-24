@@ -35,6 +35,7 @@ export const state = {
   driftSpeed: 1,
   harmonics: 1,
   haze: 1,
+  bass: 0,
   noise: 0,
   reverb: 0,
   status: '',

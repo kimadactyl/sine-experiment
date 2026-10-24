@@ -10,6 +10,8 @@ let ctx;
 let master;
 let wet;
 let noise;
+let lowcut;
+let lowshelf;
 let analyser;
 let scopeBuf;
 const voices = [];
@@ -30,14 +32,13 @@ export function startAudio(state) {
   wet.gain.value = 0;
 
   // Phone and laptop speakers buzz on loud low sines, so thin out the bottom before anything else.
-  const lowcut = ctx.createBiquadFilter();
+  lowcut = ctx.createBiquadFilter();
   lowcut.type = 'highpass';
-  lowcut.frequency.value = 140;
   lowcut.Q.value = 0.7;
-  const lowshelf = ctx.createBiquadFilter();
+  lowshelf = ctx.createBiquadFilter();
   lowshelf.type = 'lowshelf';
   lowshelf.frequency.value = 300;
-  lowshelf.gain.value = -12;
+  setBass(state.bass);
   lowcut.connect(lowshelf);
 
   const comp = ctx.createDynamicsCompressor();
@@ -131,6 +132,20 @@ export function updateAudio(state) {
   noise.gain.setTargetAtTime(state.noise * NOISE_LEVEL, t, 0.2);
   wet.gain.setTargetAtTime(state.reverb, t, 0.2);
   master.gain.setTargetAtTime(state.master * OUTPUT_GAIN, t, 0.1);
+  setBass(state.bass, t);
+}
+
+// 0 is safe for phone speakers; 1 brings the low end back to a little fuller than the unfiltered mix.
+function setBass(bass, t) {
+  const freq = 140 * (60 / 140) ** bass;
+  const gain = -12 + 6 * bass;
+  if (t === undefined) {
+    lowcut.frequency.value = freq;
+    lowshelf.gain.value = gain;
+  } else {
+    lowcut.frequency.setTargetAtTime(freq, t, 0.1);
+    lowshelf.gain.setTargetAtTime(gain, t, 0.1);
+  }
 }
 
 // Fade out before suspending so pausing doesn't click; updateAudio fades back in on resume.
