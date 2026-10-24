@@ -4,6 +4,7 @@ import { draw, lastFrame } from './draw.js';
 import { createConductor } from './conductor.js';
 import { attachInput } from './input.js';
 import { attachControls } from './controls.js';
+import { updateOverlaps } from './overlaps.js';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -42,6 +43,7 @@ function frame(now) {
   last = now;
   if (running) {
     conductor.update(dt);
+    updateOverlaps(state);
     updateAudio(state);
   }
   draw(ctx, w, h, dpr, state, dt);

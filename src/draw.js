@@ -1,4 +1,4 @@
-import { radius, hue, lightness, CHROMA, rippleDepth, grainAlpha, colour } from './mapping.js';
+import { radius, hue, lightness, CHROMA, rippleDepth, grainAlpha, lensAlpha, colour } from './mapping.js';
 import { TAU } from './util.js';
 
 const EDGE_STEPS = 200;
@@ -10,6 +10,7 @@ const spin = [];
 export const lastFrame = [];
 
 let grain;
+const shapes = [];
 
 export function draw(ctx, w, h, dpr, state, dt) {
   const unit = Math.min(w, h);
@@ -19,19 +20,23 @@ export function draw(ctx, w, h, dpr, state, dt) {
   state.voices.forEach((v, i) => {
     spin[i] = (spin[i] ?? 0) + dt * 0.15 * (v.freq / 165);
     if (v.amp < 0.002) {
+      shapes[i] = null;
       lastFrame[i] = null;
       return;
     }
     const r = radius(v.freq, v.amp, unit);
     const H = hue(v.freq);
     const L = lightness(v.amp);
-    const cx = w / 2 + v.ox * unit;
-    const cy = h / 2 + v.oy * unit;
-    circle(ctx, cx, cy, r, v, H, L, spin[i], dpr);
+    const shape = { cx: w / 2 + v.ox * unit, cy: h / 2 + v.oy * unit, r, v, phase: spin[i] };
+    shapes[i] = shape;
+    circle(ctx, shape, H, L, dpr);
     lastFrame[i] = { freq: v.freq, amp: v.amp, r, hue: H };
   });
 
   ctx.globalCompositeOperation = 'source-over';
+  for (const o of state.overlaps) {
+    if (o.level > 0.002 && shapes[o.a] && shapes[o.b]) lens(ctx, shapes[o.a], shapes[o.b], o);
+  }
   drawGrain(ctx, w, h, state.noise);
 }
 
@@ -55,13 +60,7 @@ function background(ctx, w, h, state) {
   ctx.fillRect(0, 0, w, h);
 }
 
-function circle(ctx, cx, cy, r, v, H, L, phase, dpr) {
-  const halo = ctx.createRadialGradient(cx, cy, r * 0.6, cx, cy, r * 2.4);
-  halo.addColorStop(0, colour(L, CHROMA, H, 0.16 * v.amp));
-  halo.addColorStop(1, colour(L, CHROMA, H, 0));
-  ctx.fillStyle = halo;
-  ctx.fillRect(cx - r * 2.4, cy - r * 2.4, r * 4.8, r * 4.8);
-
+function edge(ctx, { cx, cy, r, v, phase }) {
   ctx.beginPath();
   for (let s = 0; s <= EDGE_STEPS; s++) {
     const theta = (s / EDGE_STEPS) * TAU;
@@ -76,6 +75,17 @@ function circle(ctx, cx, cy, r, v, H, L, phase, dpr) {
     else ctx.lineTo(px, py);
   }
   ctx.closePath();
+}
+
+function circle(ctx, shape, H, L, dpr) {
+  const { cx, cy, r, v } = shape;
+  const halo = ctx.createRadialGradient(cx, cy, r * 0.6, cx, cy, r * 2.4);
+  halo.addColorStop(0, colour(L, CHROMA, H, 0.16 * v.amp));
+  halo.addColorStop(1, colour(L, CHROMA, H, 0));
+  ctx.fillStyle = halo;
+  ctx.fillRect(cx - r * 2.4, cy - r * 2.4, r * 4.8, r * 4.8);
+
+  edge(ctx, shape);
 
   const body = ctx.createRadialGradient(cx, cy - r * 0.2, 0, cx, cy, r * 1.2);
   body.addColorStop(0, colour(L + 0.12, CHROMA * 0.7, H, 0.7 * v.amp));
@@ -85,6 +95,30 @@ function circle(ctx, cx, cy, r, v, H, L, phase, dpr) {
   ctx.strokeStyle = colour(L + 0.15, CHROMA, H, 0.6 * v.amp);
   ctx.lineWidth = 1.2 * dpr;
   ctx.stroke();
+}
+
+// Fill only where both circles are, in the colour of the pair's own note.
+function lens(ctx, a, b, o) {
+  const d = Math.hypot(b.cx - a.cx, b.cy - a.cy) || 1;
+  const near = Math.max(0, d - b.r);
+  const far = Math.min(d + b.r, a.r);
+  const along = (near + far) / 2 / d;
+  const x = a.cx + (b.cx - a.cx) * along;
+  const y = a.cy + (b.cy - a.cy) * along;
+  const H = hue(o.freq);
+  const L = lightness(o.level) + 0.1;
+  const alpha = lensAlpha(o.level);
+  const g = ctx.createRadialGradient(x, y, 0, x, y, Math.max(far - near, 1));
+  g.addColorStop(0, colour(L + 0.1, CHROMA, H, alpha));
+  g.addColorStop(1, colour(L, CHROMA, H, alpha * 0.45));
+
+  ctx.save();
+  edge(ctx, a);
+  ctx.clip();
+  edge(ctx, b);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawGrain(ctx, w, h, noise) {

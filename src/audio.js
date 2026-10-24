@@ -3,6 +3,7 @@ import { pan } from './mapping.js';
 
 const VOICE_LEVEL = 0.15;
 const NOISE_LEVEL = 0.015;
+const OVERLAP_LEVEL = 0.12;
 
 let ctx;
 let master;
@@ -11,6 +12,7 @@ let noise;
 let analyser;
 let scopeBuf;
 const voices = [];
+const pairs = [];
 
 export function startAudio(state) {
   ctx = new AudioContext();
@@ -74,6 +76,17 @@ export function startAudio(state) {
     }
     voices.push({ out, panner, oscs, gains });
   }
+
+  for (const o of state.overlaps) {
+    const osc = ctx.createOscillator();
+    osc.frequency.value = o.freq;
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    const panner = ctx.createStereoPanner();
+    osc.connect(out).connect(panner).connect(mix);
+    osc.start();
+    pairs.push({ osc, out, panner });
+  }
 }
 
 // Called every frame with the same state draw.js is about to draw.
@@ -88,6 +101,12 @@ export function updateAudio(state) {
       n.oscs[k].frequency.setTargetAtTime(v.freq * (k + 1), t, 0.02);
       n.gains[k].gain.setTargetAtTime(v.partials[k], t, 0.05);
     }
+  });
+  state.overlaps.forEach((o, i) => {
+    const n = pairs[i];
+    n.osc.frequency.setTargetAtTime(o.freq, t, 0.02);
+    n.out.gain.setTargetAtTime(o.level * OVERLAP_LEVEL, t, 0.08);
+    n.panner.pan.setTargetAtTime(pan(o.ox), t, 0.1);
   });
   noise.gain.setTargetAtTime(state.noise * NOISE_LEVEL, t, 0.2);
   wet.gain.setTargetAtTime(state.reverb, t, 0.2);
