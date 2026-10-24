@@ -243,6 +243,7 @@ export function createConductor() {
     });
 
     state.noise = 0.8 * ramp(t, 20, 80) * state.haze;
+    state.wobble = wobble;
     state.reverb = Math.min(1, (0.15 + 0.3 * ramp(t, 0, 60)) * state.haze);
     const n = living().length;
     state.status = `${n} circle${n === 1 ? '' : 's'}`;

@@ -5,10 +5,13 @@ import { createConductor } from './conductor.js';
 import { attachInput } from './input.js';
 import { attachControls } from './controls.js';
 import { updateOverlaps } from './overlaps.js';
+import { createDither } from './dither.js';
+import { ditherLevels } from './mapping.js';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const begin = document.getElementById('begin');
+const dither = createDither(canvas, document.getElementById('dither'));
 
 let w = 0;
 let h = 0;
@@ -56,6 +59,7 @@ function frame(now) {
     updateAudio(state);
   }
   draw(ctx, w, h, dpr, state, live ? dt : 0);
+  dither(ditherLevels(state.noise), dpr);
   showStatus();
   requestAnimationFrame(frame);
 }

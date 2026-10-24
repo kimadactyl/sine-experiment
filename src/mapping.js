@@ -29,6 +29,10 @@ export const lensAlpha = (level) => clamp(level * 2.5, 0, 0.85);
 
 export const pan = (ox) => clamp(ox * 1.5, -0.8, 0.8);
 
-export const grainAlpha = (noise) => noise * 0.07;
+// Shades per colour channel in the dither: the noise bed coarsens it from barely there to fine speckle.
+export const ditherLevels = (noise) => Math.max(12, 40 - 16 * noise);
+
+// Tape wobble shows as a faint tremble along each edge.
+export const trembleDepth = (wobbleCents) => 0.003 + wobbleCents * 0.0015;
 
 export const colour = (L, C, H, a = 1) => `oklch(${L} ${C} ${H} / ${a})`;

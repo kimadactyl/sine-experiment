@@ -20,6 +20,9 @@
       height: 100%;
       touch-action: none;
     }
+    #dither {
+      pointer-events: none;
+    }
     #begin {
       position: fixed;
       inset: 0;
@@ -98,6 +101,7 @@
 </head>
 <body>
   <canvas id="canvas"></canvas>
+  <canvas id="dither"></canvas>
 
   <button id="begin">
     <h1>sine experiment</h1>

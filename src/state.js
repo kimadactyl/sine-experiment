@@ -37,6 +37,7 @@ export const state = {
   haze: 1,
   bass: 0,
   noise: 0,
+  wobble: 0,
   reverb: 0,
   status: '',
 };
