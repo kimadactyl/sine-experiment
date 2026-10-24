@@ -137,7 +137,7 @@ export function updateAudio(state) {
     n.out.gain.setTargetAtTime(o.level * OVERLAP_LEVEL, t, 0.08);
     n.panner.pan.setTargetAtTime(pan(o.ox), t, 0.1);
   });
-  noise.gain.setTargetAtTime(state.noise * NOISE_LEVEL, t, 0.2);
+  noise.gain.setTargetAtTime(state.noise * state.brown * NOISE_LEVEL, t, 0.2);
   wet.gain.setTargetAtTime(state.reverb, t, 0.2);
   master.gain.setTargetAtTime(state.master * OUTPUT_GAIN, t, 0.1);
   setBass(state.bass, t);

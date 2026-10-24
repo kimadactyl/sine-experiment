@@ -36,6 +36,7 @@ export const state = {
   harmonics: 1,
   haze: 1,
   bass: 0,
+  brown: 0.33,
   noise: 0,
   wobble: 0,
   reverb: 0,
