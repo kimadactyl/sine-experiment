@@ -166,7 +166,7 @@ export function createConductor() {
     const motion = ramp(t, 0, 15);
     const breathDepth = 0.45 * ramp(t, 0, 12);
     const fullness = tide();
-    const harm = ramp(t, 40, 100) * (0.4 + 0.6 * fullness) * (0.45 + 0.55 * (0.5 + 0.5 * Math.sin((TAU * t) / 97))) * state.harmonics;
+    const harm = (0.35 + 0.65 * ramp(t, 30, 100)) * (0.4 + 0.6 * fullness) * (0.45 + 0.55 * (0.5 + 0.5 * Math.sin((TAU * t) / 97))) * state.harmonics;
     const wobble = 6 * ramp(t, 10, 60) * state.haze;
     const { hx, hy } = state.view;
 

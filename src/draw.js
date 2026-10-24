@@ -1,4 +1,4 @@
-import { radius, hue, lightness, CHROMA, rippleDepth, grainAlpha, lensAlpha, colour } from './mapping.js';
+import { radius, hue, lightness, presence, CHROMA, rippleDepth, spikeDepth, grainAlpha, lensAlpha, colour } from './mapping.js';
 import { TAU } from './util.js';
 
 const EDGE_STEPS = 360;
@@ -54,8 +54,8 @@ function background(ctx, w, h, state) {
   const H = total > 0 ? ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360 : 0;
   const s = Math.min(1, total);
   const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.hypot(w, h) / 2);
-  g.addColorStop(0, colour(0.17 + 0.05 * s, 0.035 * s, H));
-  g.addColorStop(1, colour(0.1, 0.012 * s, H));
+  g.addColorStop(0, colour(0.17 + 0.05 * s, 0.05 * s, H));
+  g.addColorStop(1, colour(0.1, 0.018 * s, H));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 }
@@ -71,7 +71,7 @@ function edge(ctx, { cx, cy, r, v, phase }) {
       const n = k + 1;
       rr += rippleDepth(v.partials[k]) * Math.sin(n * theta + phase * n * (1 + 0.15 * k));
       // Spike harmonics share one phase, so they pile up into `points` sharp tips.
-      rr += swell * rippleDepth(v.spikes[k]) * Math.cos(n * v.points * (theta - phase * 0.3));
+      rr += swell * spikeDepth(v.spikes[k]) * Math.cos(n * v.points * (theta - phase * 0.3));
     }
     const px = cx + Math.cos(theta) * r * rr;
     const py = cy + Math.sin(theta) * r * rr;
@@ -84,7 +84,8 @@ function edge(ctx, { cx, cy, r, v, phase }) {
 function circle(ctx, shape, H, L, dpr) {
   const { cx, cy, r, v } = shape;
   const halo = ctx.createRadialGradient(cx, cy, r * 0.6, cx, cy, r * 2.4);
-  halo.addColorStop(0, colour(L, CHROMA, H, 0.16 * v.amp));
+  const P = presence(v.amp);
+  halo.addColorStop(0, colour(L, CHROMA, H, 0.2 * P));
   halo.addColorStop(1, colour(L, CHROMA, H, 0));
   ctx.fillStyle = halo;
   ctx.fillRect(cx - r * 2.4, cy - r * 2.4, r * 4.8, r * 4.8);
@@ -92,11 +93,11 @@ function circle(ctx, shape, H, L, dpr) {
   edge(ctx, shape);
 
   const body = ctx.createRadialGradient(cx, cy - r * 0.2, 0, cx, cy, r * 1.2);
-  body.addColorStop(0, colour(L + 0.12, CHROMA * 0.7, H, 0.7 * v.amp));
-  body.addColorStop(1, colour(L, CHROMA, H, 0.25 * v.amp));
+  body.addColorStop(0, colour(L + 0.12, CHROMA * 0.7, H, 0.75 * P));
+  body.addColorStop(1, colour(L, CHROMA, H, 0.3 * P));
   ctx.fillStyle = body;
   ctx.fill();
-  ctx.strokeStyle = colour(L + 0.15, CHROMA, H, 0.6 * v.amp);
+  ctx.strokeStyle = colour(L + 0.15, CHROMA, H, 0.7 * P);
   ctx.lineWidth = 1.2 * dpr;
   ctx.stroke();
 }
