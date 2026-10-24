@@ -8,8 +8,8 @@ const SILENT = 0.003;
 const INTRO = 90;
 const SPIKE_LEVEL = 0.45;
 
-// Ears hear high sines as louder than low ones at the same level, so higher circles play softer.
-const pitchLoudness = (freq) => Math.min(1.15, (START_KEY / freq) ** 0.6);
+// Ears hear high sines as louder than low ones at the same level, so higher circles play softer; low ones aren't boosted, for small speakers' sake.
+const pitchLoudness = (freq) => Math.min(1, (START_KEY / freq) ** 0.6);
 
 // Harmonics landing above about 1 kHz, where hearing is most sensitive, fade away.
 const soften = (freq) => 1 / (1 + (freq / 1200) ** 4);

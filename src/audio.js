@@ -4,6 +4,7 @@ import { pan } from './mapping.js';
 const VOICE_LEVEL = 0.15;
 const NOISE_LEVEL = 0.015;
 const OVERLAP_LEVEL = 0.12;
+const OUTPUT_GAIN = 2.5;
 
 let ctx;
 let master;
@@ -28,6 +29,17 @@ export function startAudio(state) {
   wet = ctx.createGain();
   wet.gain.value = 0;
 
+  // Phone and laptop speakers buzz on loud low sines, so thin out the bottom before anything else.
+  const lowcut = ctx.createBiquadFilter();
+  lowcut.type = 'highpass';
+  lowcut.frequency.value = 140;
+  lowcut.Q.value = 0.7;
+  const lowshelf = ctx.createBiquadFilter();
+  lowshelf.type = 'lowshelf';
+  lowshelf.frequency.value = 300;
+  lowshelf.gain.value = -12;
+  lowcut.connect(lowshelf);
+
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -20;
   comp.knee.value = 12;
@@ -37,14 +49,22 @@ export function startAudio(state) {
 
   master = ctx.createGain();
   master.gain.value = 0;
+  // Safety net only: sits idle unless a rare pile-up would clip.
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -3;
+  limiter.knee.value = 0;
+  limiter.ratio.value = 20;
+  limiter.attack.value = 0.002;
+  limiter.release.value = 0.15;
   analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
   scopeBuf = new Float32Array(analyser.fftSize);
 
   mix.connect(lowpass);
-  lowpass.connect(comp);
-  lowpass.connect(reverb).connect(wet).connect(comp);
-  comp.connect(master).connect(analyser).connect(ctx.destination);
+  lowpass.connect(lowcut);
+  lowpass.connect(reverb).connect(wet).connect(lowcut);
+  lowshelf.connect(comp);
+  comp.connect(master).connect(limiter).connect(analyser).connect(ctx.destination);
 
   const noiseSrc = ctx.createBufferSource();
   noiseSrc.buffer = brownNoise(4);
@@ -54,7 +74,7 @@ export function startAudio(state) {
   noiseFilter.frequency.value = 900;
   noise = ctx.createGain();
   noise.gain.value = 0;
-  noiseSrc.connect(noiseFilter).connect(noise).connect(comp);
+  noiseSrc.connect(noiseFilter).connect(noise).connect(lowcut);
   noiseSrc.start();
 
   for (const v of state.voices) {
@@ -110,7 +130,7 @@ export function updateAudio(state) {
   });
   noise.gain.setTargetAtTime(state.noise * NOISE_LEVEL, t, 0.2);
   wet.gain.setTargetAtTime(state.reverb, t, 0.2);
-  master.gain.setTargetAtTime(state.master, t, 0.1);
+  master.gain.setTargetAtTime(state.master * OUTPUT_GAIN, t, 0.1);
 }
 
 // Fade out before suspending so pausing doesn't click; updateAudio fades back in on resume.
