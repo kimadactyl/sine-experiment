@@ -19,6 +19,8 @@ const voices = [];
 const pairs = [];
 
 export function startAudio(state) {
+  // iOS mutes web audio on the silent switch unless the page says it's playing music.
+  if (navigator.audioSession) navigator.audioSession.type = 'playback';
   ctx = new AudioContext();
 
   const mix = ctx.createGain();
@@ -166,6 +168,11 @@ export function setPaused(paused) {
   } else {
     ctx.resume();
   }
+}
+
+// iOS suspends audio when the page is hidden or a call or notification interrupts it, and never resumes it itself.
+export function wakeAudio() {
+  if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
 }
 
 // Loudness of what's actually leaving the speakers, for checking it's alive.

@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { startAudio, updateAudio, setPaused, rms } from './audio.js';
+import { startAudio, updateAudio, setPaused, wakeAudio, rms } from './audio.js';
 import { draw, lastFrame } from './draw.js';
 import { createConductor } from './conductor.js';
 import { attachInput } from './input.js';
@@ -41,6 +41,14 @@ function togglePause() {
   keepAwake(!paused);
   return paused;
 }
+
+const resume = () => {
+  if (running && !paused) wakeAudio();
+};
+document.addEventListener('visibilitychange', resume);
+addEventListener('pageshow', resume);
+// Some browsers only allow audio to restart from a tap, so any touch gets another go.
+addEventListener('pointerdown', resume);
 
 const conductor = createConductor();
 const showStatus = attachControls(state, conductor, togglePause);
