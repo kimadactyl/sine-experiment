@@ -23,9 +23,12 @@
     }
     canvas {
       position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      /* The large viewport reaches under the status bar and home bar on a home-screen iPhone. */
+      height: 100lvh;
       touch-action: none;
     }
     #dither {
@@ -62,8 +65,8 @@
     }
     #toggle {
       position: fixed;
-      right: 12px;
-      bottom: 12px;
+      right: calc(12px + env(safe-area-inset-right));
+      bottom: calc(12px + env(safe-area-inset-bottom));
       width: 28px;
       height: 28px;
       border-radius: 50%;
@@ -75,8 +78,8 @@
     }
     #panel {
       position: fixed;
-      left: 12px;
-      bottom: 12px;
+      left: calc(12px + env(safe-area-inset-left));
+      bottom: calc(12px + env(safe-area-inset-bottom));
       padding: 12px 14px;
       border-radius: 10px;
       background: #00000066;

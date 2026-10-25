@@ -23,13 +23,16 @@ function resize() {
   // Setting the canvas size wipes it, so a paused picture has to be drawn again.
   frozen = null;
   dpr = Math.min(2, devicePixelRatio || 1);
-  w = canvas.width = Math.round(innerWidth * dpr);
-  h = canvas.height = Math.round(innerHeight * dpr);
-  const unit = Math.min(innerWidth, innerHeight);
-  state.view.hx = innerWidth / 2 / unit;
-  state.view.hy = innerHeight / 2 / unit;
+  // Measured from the canvas itself, since iOS reports a shorter window than the canvas covers.
+  const box = canvas.getBoundingClientRect();
+  w = canvas.width = Math.round(box.width * dpr);
+  h = canvas.height = Math.round(box.height * dpr);
+  const unit = Math.min(box.width, box.height);
+  state.view.hx = box.width / 2 / unit;
+  state.view.hy = box.height / 2 / unit;
 }
 addEventListener('resize', resize);
+if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
 resize();
 
 let running = false;
